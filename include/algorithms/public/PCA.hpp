@@ -49,18 +49,26 @@ public:
     mInitialized = true;
   }
 
-  void processFrame(const RealVectorView in, RealVectorView out, index k) const
+  void processFrame(const RealVectorView in, RealVectorView out, index k, bool whiten = false) const
   {
     using namespace Eigen;
     using namespace _impl;
-    if (k >= mBases.cols()) return;
+    if (k > mBases.cols()) return;
     VectorXd input = asEigen<Matrix>(in);
     input = input - mMean;
     VectorXd result = input.transpose() * mBases.block(0, 0, mBases.rows(), k);
+
+    if (whiten)
+      result.array() *=
+          (mValues.array().segment(0, k) != 0)
+              .select((mValues.array().segment(0, k).square() / mSamplesSeen)
+                          .rsqrt(),
+                      0);
+
     out = _impl::asFluid(result);
   }
 
-  double process(const RealMatrixView in, RealMatrixView out, index k) const
+  double process(const RealMatrixView in, RealMatrixView out, index k, bool whiten = false) const
   {
     using namespace Eigen;
     using namespace _impl;
@@ -68,6 +76,14 @@ public:
     MatrixXd input = asEigen<Matrix>(in);
     MatrixXd result = (input.rowwise() - mMean.transpose()) *
                       mBases.block(0, 0, mBases.rows(), k);
+
+    if (whiten)
+      result.array() *=
+          (mValues.array().segment(0, k) != 0)
+              .select((mValues.array().segment(0, k).square() / mSamplesSeen)
+                          .rsqrt(),
+                      0);
+
     double variance = 0;
     double total = mValues.sum();
     for (index i = 0; i < k; i++) variance += mValues[i];

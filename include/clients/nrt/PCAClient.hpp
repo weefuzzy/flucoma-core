@@ -17,10 +17,11 @@ namespace fluid {
 namespace client {
 namespace pca {
 
-enum { kNumDimensions, kInputBuffer, kOutputBuffer };
+enum { kNumDimensions, kWhiten, kInputBuffer, kOutputBuffer };
 
 constexpr auto PCAParams = defineParameters(
     LongParam("numDimensions", "Target Number of Dimensions", 2, Min(1)),
+    LongParam("whiten", "Whiten output", 0, Min(0),Max(1)),
     BufferParam("inputPointBuffer", "Input Point Buffer"),
     BufferParam("predictionBuffer", "Prediction Buffer"));
 
@@ -120,7 +121,7 @@ public:
 
       StringVector ids{srcDataSet.getIds()};
       RealMatrix   output(srcDataSet.size(), k);
-      result = mAlgorithm.process(srcDataSet.getData(), output, k);
+      result = mAlgorithm.process(srcDataSet.getData(), output, k, get<kWhiten>());
       FluidDataSet<string, double, 1> result(ids, output);
       destPtr->setDataSet(result);
     }
@@ -146,7 +147,7 @@ public:
     FluidTensor<double, 1> src(mAlgorithm.dims());
     FluidTensor<double, 1> dest(k);
     src = BufferAdaptor::ReadAccess(in.get()).samps(0, mAlgorithm.dims(), 0);
-    mAlgorithm.processFrame(src, dest, k);
+    mAlgorithm.processFrame(src, dest, k, get<kWhiten>());
     BufferAdaptor::Access(out.get()).samps(0) = dest;
     return {};
   }
