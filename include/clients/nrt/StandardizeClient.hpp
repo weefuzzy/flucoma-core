@@ -122,7 +122,7 @@ public:
     RealVector dest(mAlgorithm.dims());
     src = BufferAdaptor::ReadAccess(in.get()).samps(0, mAlgorithm.dims(), 0);
     mAlgorithm.processFrame(src, dest, get<kInvert>() == 1);
-    outBuf.samps(0) = dest;
+    outBuf.samps(0,mAlgorithm.dims(), 0) = dest;
     return OK();
   }
 
@@ -135,6 +135,25 @@ public:
     return result;
   }
 
+  MessageResult<void> partialFit(DataSetClientRef sourceClient)
+  {
+    if (!mAlgorithm.initialized()) return Error(NoDataFitted);
+    auto weakPtr = sourceClient.get();
+    if (auto datasetClientPtr = weakPtr.lock())
+    {
+      auto dataset = datasetClientPtr->getDataSet();
+      if (dataset.size() == 0) return Error(EmptyDataSet);
+      if (dataset.dims() != mAlgorithm.dims()) return Error(DimensionsDontMatch);
+      mAlgorithm.update(dataset.getData());
+      return OK();
+    }
+    else
+    {
+      return Error(NoDataSet);
+    }
+  }
+
+
   static auto getMessageDescriptors()
   {
     return defineMessages(
@@ -142,6 +161,7 @@ public:
         makeMessage("fitTransform", &StandardizeClient::fitTransform),
         makeMessage("transform", &StandardizeClient::transform),
         makeMessage("transformPoint", &StandardizeClient::transformPoint),
+        makeMessage("partialFit", &StandardizeClient::partialFit),
         makeMessage("cols", &StandardizeClient::dims),
         makeMessage("clear", &StandardizeClient::clear),
         makeMessage("size", &StandardizeClient::size),

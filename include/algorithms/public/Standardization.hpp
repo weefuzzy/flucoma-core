@@ -12,6 +12,7 @@ under the European Union’s Horizon 2020 research and innovation programme
 
 #include "../util/AlgorithmUtils.hpp"
 #include "../util/FluidEigenMappings.hpp"
+#include "../util/IncrementalMeanVar.hpp"
 #include "../../data/TensorTypes.hpp"
 #include <Eigen/Core>
 #include <cassert>
@@ -34,6 +35,7 @@ public:
     mMean = input.colwise().mean();
     mStd = ((input.rowwise() - mMean.transpose()).square().colwise().mean())
                .sqrt();
+    mSamplesSeen = input.rows();
     mInitialized = true;
   }
 
@@ -82,6 +84,15 @@ public:
     out = asFluid(result);
   }
 
+  void update(const RealMatrixView in)
+  {
+    using namespace Eigen;
+    using namespace _impl;
+    ArrayXXd input = asEigen<Array>(in);
+    mSamplesSeen =
+        _impl::incrementalMeanVariance(input, mSamplesSeen, mMean, mStd);
+  }
+
   bool initialized() const { return mInitialized; }
 
   void getMean(RealVectorView out) const { out = _impl::asFluid(mMean); }
@@ -96,11 +107,13 @@ public:
     mMean.setZero();
     mStd.setZero();
     mInitialized = false;
+    mSamplesSeen = 0; 
   }
 
   ArrayXd mMean;
   ArrayXd mStd;
   bool    mInitialized{false};
+  index   mSamplesSeen{0};
 };
 }; // namespace algorithm
 }; // namespace fluid
