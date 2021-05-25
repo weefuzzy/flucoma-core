@@ -151,6 +151,34 @@ public:
     return {};
   }
 
+  MessageResult<void> partialFit(DataSetClientRef newData)
+  {
+    index k = get<kNumDimensions>();
+    if (k <= 0) return Error(SmallDim);
+    if (k > mAlgorithm.dims()) return Error(LargeDim);
+    if (!mAlgorithm.initialized()) return Error(NoDataFitted);
+    auto   srcPtr = newData.get().lock();
+    if(srcPtr)
+    {
+      auto& dataSet = srcPtr->getDataSet();
+      mAlgorithm.update(dataSet.getData());
+      return OK();
+    }
+    else
+    {
+      return Error(NoDataSet);
+    }
+  }
+  
+  MessageResult<double> partialFitTransform(DataSetClientRef sourceClient, DataSetClientRef destClient)
+  {
+    auto updateResult = partialFit(sourceClient);
+    if (!updateResult.ok()) return Error<double>(updateResult.message());
+    auto result = transform(sourceClient, destClient);
+    return result;
+  }
+  
+  
   index latency() { return 0; }
 
   static auto getMessageDescriptors()
@@ -160,6 +188,8 @@ public:
         makeMessage("transform", &PCAClient::transform),
         makeMessage("fitTransform", &PCAClient::fitTransform),
         makeMessage("transformPoint", &PCAClient::transformPoint),
+        makeMessage("partialFit", &PCAClient::partialFit),
+        makeMessage("partialFitTransform", &PCAClient::partialFitTransform),
         makeMessage("cols", &PCAClient::dims),
         makeMessage("size", &PCAClient::size),
         makeMessage("clear", &PCAClient::clear),

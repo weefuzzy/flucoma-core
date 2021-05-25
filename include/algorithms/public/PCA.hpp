@@ -11,6 +11,7 @@ under the European Union’s Horizon 2020 research and innovation programme
 #pragma once
 
 #include "../util/FluidEigenMappings.hpp"
+#include "../util/IncrementalMeanVar.hpp"
 #include "../../data/TensorTypes.hpp"
 #include <Eigen/Core>
 #include <Eigen/SVD>
@@ -37,6 +38,7 @@ public:
     mBases = svd.matrixV();
     mValues = svd.singularValues();
     mInitialized = true;
+    mSamplesSeen = in.rows(); 
   }
 
   void init(RealMatrixView bases, RealVectorView values, RealVectorView mean)
@@ -73,6 +75,35 @@ public:
     return variance / total;
   }
 
+  void update(const RealMatrixView in)
+  {
+    using namespace Eigen;
+    using namespace _impl;
+    ArrayXXd input = asEigen<Array>(in);
+    ArrayXd  colMean = mMean;
+    ArrayXd  dummyVariance(0);
+
+    index newCount = _impl::incrementalMeanVariance(input, mSamplesSeen,
+                                                    colMean, dummyVariance);
+    mSamplesSeen = newCount;
+
+    ArrayXd colBatchMean = input.colwise().mean();
+    input = input.rowwise() - colBatchMean.transpose();
+    ArrayXd meanCorrection = sqrt((mSamplesSeen / newCount) * input.rows()) *
+                             (mMean.array() - colBatchMean);
+    ArrayXXd newX(mBases.cols() + input.rows() +
+                      meanCorrection.transpose().rows(),
+                  dims());
+    newX
+        << (mBases.array().rowwise() * mValues.transpose().array()).transpose(),
+        input, meanCorrection.transpose();
+    BDCSVD<MatrixXd> svd(newX.matrix(), ComputeThinV | ComputeThinU);
+    mValues = svd.singularValues();
+    mBases = svd.matrixV();
+    mMean = colMean;
+    mSamplesSeen += input.rows();
+  }
+
   bool  initialized() const { return mInitialized; }
   void  getBases(RealMatrixView out) const { out = _impl::asFluid(mBases); }
   void  getValues(RealVectorView out) const { out = _impl::asFluid(mValues); }
@@ -84,12 +115,14 @@ public:
     mBases.setZero();
     mMean.setZero();
     mInitialized = false;
+    mSamplesSeen = 0;     
   }
 
   MatrixXd mBases;
   VectorXd mValues;
   VectorXd mMean;
   bool     mInitialized{false};
+  index    mSamplesSeen; 
 };
 }; // namespace algorithm
 }; // namespace fluid
