@@ -406,7 +406,7 @@ public:
         [](index, index) -> index { return 0; },
         [](index win, index) { return win >> 1; },
         [](index win, index hop) { return win - hop; }};
-    return {options[userPaddingParamValue](winSize, hopSize),
+    return {options[asUnsigned(userPaddingParamValue)](winSize, hopSize),
             userPaddingParamValue};
   }
 
@@ -546,12 +546,12 @@ struct StreamingControl
     //    whole number of hops to ensure that last frame gets a fair showing
     if (userPadding.second == 2)
       paddedLength =
-          (std::ceil(double(paddedLength) / controlRate) * controlRate);
+          static_cast<index>(std::ceil(double(paddedLength) / controlRate) * controlRate);
 
     // Fix me. This assumes that client.latency() is always the window size of
     // whatever buffered process we're wrapping, which seems well dodgy
     index nHops =
-        1 + std::floor((paddedLength - client.latency()) / controlRate);
+        static_cast<index>(1 + std::floor((paddedLength - client.latency()) / controlRate));
 
     // in contrast to the plain streaming case, we're going to call process()
     // iteratively with a vector size = the control vector size, so we get KR
@@ -1012,7 +1012,7 @@ private:
       mResult = mClient->template process<float>(mContext);
       resultReady.set_value();
       mState = kDone;
-      if (mCallback && !mDetached) mCallback();
+      if (mCallback && !mDetached && !mTask.cancelled()) mCallback();
       if (mDetached) delete this;
     }
 
