@@ -1,0 +1,10 @@
+name: Flucoma Core CI 
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dummy:
+    steps:
+      - name: Dummy
+      
